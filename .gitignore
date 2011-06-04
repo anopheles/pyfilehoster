@@ -1,0 +1,8 @@
+.settings
+.idea
+.project
+.pydevproject
+*.pyc
+
+rsapiresume.pl
+rsapiuploads.txt
