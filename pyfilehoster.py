@@ -231,7 +231,7 @@ class HotFileAPI(HosterAPI):
     def _catch_error(self, lines, url):
         for index, line in enumerate(lines):
             if index == 0 and line[0] == ".":
-                raise HosterAPIError, line[1:]++" url: %s" % url
+                raise HosterAPIError, line[1:]+" URL: %s" % url
 
     def get_download_links(self, folderid, hashid):
         download_links = dict()
