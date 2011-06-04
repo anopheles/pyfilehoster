@@ -23,8 +23,8 @@ class HosterAPI(object):
 
     def get_download_links(self):
         """
-            returns a dictionary with fileids as keys
-            each value is saved as a (filename, download_link) tuple
+            returns a dictionary with file ids as keys
+            each value is saved as a dictionary with at least the keys filename and url
         """
         raise NotImplementedError
 
@@ -37,7 +37,7 @@ class HosterAPI(object):
     def delete_contents_of_folder(self, folderid):
         raise NotImplementedError
 
-    def get_folder_hierarchy(self):
+    def get_folder_hierarchy(self, folderid=None):
         """
             returns a dictionary containing the folder hierarchy
         """
@@ -47,11 +47,7 @@ class HosterAPI(object):
         raise NotImplementedError
 
     def set_direct_download(self, force=True, *fileids):
-        raise NotImplemented
-
-    def get_folder_hierarchy(self, folderid=None):
-        raise NotImplemented
-
+        raise NotImplementedError
 
 class Counter():
     def __init__(self):
@@ -83,7 +79,7 @@ class Directory(object):
 
 class RapidShareAPI(HosterAPI):
     """
-        http://images.rapidshare.com/apidoc.txt
+        implements http://images.rapidshare.com/apidoc.txt
     """
     def __init__(self, credentials=None, secure=False):
         self.scheme = "http%s" % ("s" if secure else "")
@@ -94,21 +90,22 @@ class RapidShareAPI(HosterAPI):
             query = urllib.urlencode({"login": self.username,
                                       "password": self.password})
             self.base_url[4] = query
-        except ValueError:
+        except TypeError:
             pass
 
-    def _catch_error(self, lines):
+    def _catch_error(self, lines, url):
         for index, line in enumerate(lines):
             if index == 0 and "ERROR: " in line:
-                raise HosterAPIError, line[7:]
+                raise HosterAPIError, line[7:]+" URL: %s" % url
 
     def get_folder_hierarchy(self, folderid=None):
         flat = []
         folder_api_url = self.base_url[:]
         query = urllib.urlencode({"sub": "listrealfolders"})
         folder_api_url[4] += "&"+query
-        lines = urllib2.urlopen(urlunparse(folder_api_url)).readlines()
-        self._catch_error(lines)
+        url = urlunparse(folder_api_url)
+        lines = urllib2.urlopen(url).readlines()
+        self._catch_error(lines, url)
         for line in lines:
             current_folderid, parentid, foldername = line.split(",")
             if parentid == "999":
@@ -134,8 +131,9 @@ class RapidShareAPI(HosterAPI):
                                   "files": ",".join(fileids),
                                   "trafficsharetype": 1 if force else 0})
         direct_download_api_url[4] += "&"+query
-        lines = urllib2.urlopen(urlunparse(direct_download_api_url)).readlines()
-        self._catch_error(lines)
+        url = urlunparse(direct_download_api_url)
+        lines = urllib2.urlopen(url).readlines()
+        self._catch_error(lines, url)
         for line in lines:
             if "OK" in line:
                 return True
@@ -156,8 +154,9 @@ class RapidShareAPI(HosterAPI):
         if folderid is not None:
             query = urllib.urlencode({"realfolder": folderid})
             download_api_url[4] += "&"+query
-        lines = urllib2.urlopen(urlunparse(download_api_url)).readlines()
-        self._catch_error(lines)
+        url = urlunparse(download_api_url)
+        lines = urllib2.urlopen(url).readlines()
+        self._catch_error(lines, url)
         for line in lines:
             try:
                 rows = line.split(",")
@@ -191,9 +190,9 @@ class RapidShareAPI(HosterAPI):
                                   "files": ",".join(fileids),
                                   "folder": folderid})
         move_file_api_call[4] += "&"+query
-        print urlunparse(move_file_api_call)
-        lines = urllib2.urlopen(urlunparse(move_file_api_call)).readlines()
-        self._catch_error(lines)
+        url = urlunparse(move_file_api_call)
+        lines = urllib2.urlopen(url).readlines()
+        self._catch_error(lines, url)
         for line in lines:
             if "OK" in line:
                 return True
@@ -204,8 +203,9 @@ class RapidShareAPI(HosterAPI):
         query = urllib.urlencode({"sub": "deletefiles",
                                   "files": ",".join(fileids)})
         delete_api_url[4] += "&"+query
-        lines = urllib2.urlopen(urlunparse(delete_api_url)).readlines()
-        self._catch_error(lines)
+        url = urlunparse(delete_api_url)
+        lines = urllib2.urlopen(url).readlines()
+        self._catch_error(lines, url)
         for line in lines:
             if "OK" in line:
                 return True
@@ -213,7 +213,7 @@ class RapidShareAPI(HosterAPI):
 
 class HotFileAPI(HosterAPI):
     """
-        http://api.hotfile.com/
+        implements http://api.hotfile.com/
     """
 
     def __init__(self, credentials=None, secure=False):
@@ -228,20 +228,21 @@ class HotFileAPI(HosterAPI):
         except ValueError:
             pass
 
-    def _catch_error(self, lines):
+    def _catch_error(self, lines, url):
         for index, line in enumerate(lines):
             if index == 0 and line[0] == ".":
-                raise HosterAPIError, line[1:]
+                raise HosterAPIError, line[1:]++" url: %s" % url
 
-    def get_download_links(self, folderid, hash):
+    def get_download_links(self, folderid, hashid):
         download_links = dict()
         download_api_url = self.base_url[:]
         query = urllib.urlencode({"action": "getdownloadlinksfrompublicdirectory",
                                   "folder": folderid,
-                                  "hash": hash})
+                                  "hash": hashid})
         download_api_url[4] += "&"+query
-        lines = urllib2.urlopen(urlunparse(download_api_url)).readlines()
-        self._catch_error(lines)
+        url = urlunparse(download_api_url)
+        lines = urllib2.urlopen(url).readlines()
+        self._catch_error(lines, url)
         for line in lines:
             try:
                 filename, download_link = line.split("|")
@@ -258,8 +259,9 @@ class HotFileAPI(HosterAPI):
                                   "fileid": fileid,
                                   "hotlink": 1 if force else 0})
         direct_download_api_url[4] += "&"+query
-        lines = urllib2.urlopen(urlunparse(direct_download_api_url)).readlines()
-        self._catch_error(lines)
+        url = urlunparse(direct_download_api_url)
+        lines = urllib2.urlopen(url).readlines()
+        self._catch_error(lines, url)
         for line in lines:
             if "OK" in line:
                 return True
@@ -271,27 +273,29 @@ class HotFileAPI(HosterAPI):
                                   "folderid": folderid,
                                   "fileid": fileid})
         delete_api_url[4] += "&"+query
-        lines = urllib2.urlopen(urlunparse(delete_api_url)).readlines()
-        self._catch_error(lines)
+        url = urlunparse(delete_api_url)
+        lines = urllib2.urlopen(url).readlines()
+        self._catch_error(lines, url)
         for line in lines:
             if "OK" in line:
                 return True
         return False
 
-    def delete_contents_of_folder(self, folderid, hash):
-        for element in self.get_download_links(folderid, hash).values():
+    def delete_contents_of_folder(self, folderid, hashid):
+        for element in self.get_download_links(folderid, hashid).values():
             filename, download_url = element
             self.delete_remote_file(folderid, filename)
 
             
-    def upload_file(self, filepath, folderid=None, hash=None, path="", overwrite=True):
+    def upload_file(self, filepath, folderid=None, hashid=None, path="", overwrite=True):
         if overwrite:
-            for fileid, properties in self.get_download_links(folderid, hash).iteritems():
+            for fileid, properties in self.get_download_links(folderid, hashid).iteritems():
                 if properties["filename"] == os.path.basename(filepath):
                     self.delete_remote_file(folderid, fileid)
 
-        ftp = FTP('ftp.hotfile.com')
+        ftp = FTP("ftp.hotfile.com")
         ftp.login(user=self.username, passwd=self.password)
-        ftp.storbinary('STOR %s/' % path + os.path.basename(filepath), open(filepath, 'rb'), blocksize=UPLOAD_BLOCKSIZE,
+        ftp.storbinary("STOR %s/" % path + os.path.basename(filepath), open(filepath, "rb"),
+                       blocksize=UPLOAD_BLOCKSIZE,
                        callback=partial(upload_feedback, "Hotfile", filepath, Counter()))
         ftp.quit()
