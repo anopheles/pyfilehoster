@@ -227,7 +227,7 @@ class RapidShareAPI(HosterAPI):
         try:
             download_link = urlparse(re.search(r'File1.1=([\w].*)', output).group(1))
         except AttributeError:
-            raise HosterAPIError, "File wasn't completely uploaded."
+            raise HosterAPIError, "File wasn't completely uploaded." + output
         fileid = download_link.path.split('/')[2]
         if folderid is not None:
             self.move_file_to_folder(folderid, fileid)
