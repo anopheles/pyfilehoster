@@ -227,8 +227,7 @@ class RapidShareAPI(HosterAPI):
         try:
             download_link = urlparse(re.search(r'File1.1=([\w].*)', output).group(1))
         except AttributeError:
-            print output
-            return
+            raise HosterAPIError, "File wasn't completely uploaded."
         fileid = download_link.path.split('/')[2]
         if folderid is not None:
             self.move_file_to_folder(folderid, fileid)
@@ -351,8 +350,8 @@ class HotFileAPI(HosterAPI):
         ftp.quit()
 
         """
-            Return the fileid of the uploaded file. Note that it's possible that the wrong fileid is returned
-            since multiple files with the same filename can exist in a single folder.
+            Return the fileid of the uploaded file. Note that it's possible that the wrong file id is returned
+            since multiple files with the same filename can exist in the same folder.
         """
         for fileid, properties in self.get_download_links(folderid, hashid).iteritems():
                 if properties["filename"] == os.path.basename(filepath):
