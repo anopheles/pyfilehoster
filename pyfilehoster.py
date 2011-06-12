@@ -1,4 +1,46 @@
 # -*- coding: utf-8 -*-
+"""
+pyfilehoster provides a pythonic API to your favorite file hoster.
+
+Homepage and documentation: https://github.com/anopheles/pyfilehoster
+
+Licence (MIT)
+-------------
+
+    Copyright (c) 2011, David Kaufman.
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+    THE SOFTWARE.
+
+
+Example
+-------
+
+credentials = ("username", "password")
+rsapi = RapidShareAPI(credentials)
+rsapi.upload_file(filepath)
+print rsapi.get_download_links()
+
+"""
+
+__author__ = 'David Kaufman'
+__version__ = (0,0,1,"dev")
+__license__ = 'MIT'
 
 import subprocess
 import shlex
@@ -44,6 +86,9 @@ class HosterAPI(object):
         raise NotImplementedError
 
     def upload_file(self, filepath):
+        """
+            returns the file id of the uploaded file
+        """
         raise NotImplementedError
 
     def set_direct_download(self, force=True, *fileids):
@@ -125,10 +170,10 @@ class RapidShareAPI(HosterAPI):
             return id2directory[folderid].children
         return root.children
 
-    def set_direct_download(self, force=True, *fileids):
+    def set_direct_download(self, fileid, force=True):
         direct_download_api_url = self.base_url[:]
         query = urllib.urlencode({"sub": "trafficsharetype",
-                                  "files": ",".join(fileids),
+                                  "files": fileid,
                                   "trafficsharetype": 1 if force else 0})
         direct_download_api_url[4] += "&"+query
         url = urlunparse(direct_download_api_url)
@@ -179,10 +224,15 @@ class RapidShareAPI(HosterAPI):
         perl_script_path = os.path.join(os.path.dirname(__file__), "rsapiresume.pl")
         args = shlex.split('perl "%s" "%s" %s %s 1 2' % (perl_script_path, filepath, self.username, self.password))
         output = subprocess.Popen(args, shell=True, stdout=subprocess.PIPE).communicate()[0]
-        if folderid is not None:
+        try:
             download_link = urlparse(re.search(r'File1.1=([\w].*)', output).group(1))
-            fileid = download_link.path.split('/')[2]
+        except AttributeError:
+            print output
+            return
+        fileid = download_link.path.split('/')[2]
+        if folderid is not None:
             self.move_file_to_folder(folderid, fileid)
+        return fileid
 
     def move_file_to_folder(self, folderid, *fileids):
         move_file_api_call = self.base_url[:]
@@ -299,3 +349,11 @@ class HotFileAPI(HosterAPI):
                        blocksize=UPLOAD_BLOCKSIZE,
                        callback=partial(upload_feedback, "Hotfile", filepath, Counter()))
         ftp.quit()
+
+        """
+            Return the fileid of the uploaded file. Note that it's possible that the wrong fileid is returned
+            since multiple files with the same filename can exist in a single folder.
+        """
+        for fileid, properties in self.get_download_links(folderid, hashid).iteritems():
+                if properties["filename"] == os.path.basename(filepath):
+                    return fileid
